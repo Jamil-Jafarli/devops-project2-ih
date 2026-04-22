@@ -13,6 +13,7 @@ env:
   BACKEND_APP_NAME: burger-backend-app
   FRONTEND_APP_NAME: burger-frontend-app
   RESOURCE_GROUP: devops-project-2-group-2
+  LOCATION: uaenorth
 
 jobs:
   build-and-deploy:
@@ -51,6 +52,37 @@ jobs:
         uses: azure/login@v1
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Create App Service Plan (if not exists)
+        run: |
+          if ! az appservice plan show --name burger-plan --resource-group ${{ env.RESOURCE_GROUP }} &>/dev/null; then
+            az appservice plan create \
+              --name burger-plan \
+              --resource-group ${{ env.RESOURCE_GROUP }} \
+              --location ${{ env.LOCATION }} \
+              --is-linux \
+              --sku B1
+          fi
+
+      - name: Create backend App Service (if not exists)
+        run: |
+          if ! az webapp show --name ${{ env.BACKEND_APP_NAME }} --resource-group ${{ env.RESOURCE_GROUP }} &>/dev/null; then
+            az webapp create \
+              --name ${{ env.BACKEND_APP_NAME }} \
+              --resource-group ${{ env.RESOURCE_GROUP }} \
+              --plan burger-plan \
+              --deployment-container-image-name ${{ env.BACKEND_IMAGE }}:latest
+          fi
+
+      - name: Create frontend App Service (if not exists)
+        run: |
+          if ! az webapp show --name ${{ env.FRONTEND_APP_NAME }} --resource-group ${{ env.RESOURCE_GROUP }} &>/dev/null; then
+            az webapp create \
+              --name ${{ env.FRONTEND_APP_NAME }} \
+              --resource-group ${{ env.RESOURCE_GROUP }} \
+              --plan burger-plan \
+              --deployment-container-image-name ${{ env.FRONTEND_IMAGE }}:latest
+          fi
 
       - name: Deploy backend to Azure App Service
         uses: azure/webapps-deploy@v2
