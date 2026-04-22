@@ -1,0 +1,71 @@
+version: "3.9"
+ 
+services:
+  database:
+    image: postgres:15-alpine
+    container_name: burger_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: burgerbuilder
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: YourStrong!Passw0rd
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - burger_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d burgerbuilder"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+ 
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: burger_backend
+    restart: unless-stopped
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      DB_HOST: database
+      DB_PORT: 5432
+      DB_NAME: burgerbuilder
+      DB_USERNAME: postgres
+      DB_PASSWORD: YourStrong!Passw0rd
+      DB_DRIVER: org.postgresql.Driver
+      SERVER_PORT: 8080
+      CORS_ALLOWED_ORIGINS: http://localhost:80,http://localhost
+    ports:
+      - "8080:8080"
+    depends_on:
+      database:
+        condition: service_healthy
+    networks:
+      - burger_network
+ 
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        VITE_API_BASE_URL: ""
+    container_name: burger_frontend
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+    networks:
+      - burger_network
+ 
+networks:
+  burger_network:
+    driver: bridge
+ 
+volumes:
+  postgres_data:
+    driver: local
+ 
