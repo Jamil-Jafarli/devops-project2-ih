@@ -61,7 +61,7 @@ jobs:
               --resource-group ${{ env.RESOURCE_GROUP }} \
               --location ${{ env.LOCATION }} \
               --is-linux \
-              --sku B1
+              --sku B3
           fi
 
       - name: Create backend App Service (if not exists)
