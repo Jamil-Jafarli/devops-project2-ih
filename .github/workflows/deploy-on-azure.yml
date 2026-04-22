@@ -145,5 +145,6 @@ jobs:
           resource-group: ${{ env.RESOURCE_GROUP }}
           app-settings-json: |
             [
-              { "name": "WEBSITES_PORT", "value": "80" }
+              { "name": "WEBSITES_PORT", "value": "80" },
+              { "name": "BACKEND_URL", "value": "${{ env.BACKEND_APP_NAME }}.azurewebsites.net" }
             ]
