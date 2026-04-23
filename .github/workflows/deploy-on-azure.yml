@@ -48,7 +48,7 @@ jobs:
           push: true
           tags: ${{ env.FRONTEND_IMAGE }}:latest,${{ env.FRONTEND_IMAGE }}:${{ github.sha }}
           build-args: |
-            VITE_API_BASE_URL=
+            VITE_API_BASE_URL=https://burger-backend-app.azurewebsites.net
       - name: Azure login
         uses: azure/login@v1
         with:
@@ -148,3 +148,4 @@ jobs:
               { "name": "WEBSITES_PORT", "value": "80" },
               { "name": "BACKEND_URL", "value": "${{ env.BACKEND_APP_NAME }}.azurewebsites.net" }
             ]
+
