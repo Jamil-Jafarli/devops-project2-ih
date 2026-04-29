@@ -372,6 +372,7 @@ jobs:
             administrator_password        = random_password.db_password.result
             storage_mb                    = 32768
             sku_name                      = "B_Standard_B1ms"
+            zone                          = "2"
 
             depends_on = [azurerm_private_dns_zone_virtual_network_link.postgres]
           }
@@ -505,10 +506,20 @@ jobs:
       - name: Import Pre-existing Resources
         working-directory: infra
         run: |
-          # Import resource group if it exists but is not yet in state
-          RG_ID=$(az group show --name "devops-project-2-group-2" --query id -o tsv 2>/dev/null || echo "")
+          SUB_ID="$ARM_SUBSCRIPTION_ID"
+          RG="devops-project-2-group-2"
+
+          # Resource Group
+          RG_ID=$(az group show --name "$RG" --query id -o tsv 2>/dev/null || echo "")
           if [ -n "$RG_ID" ]; then
             terraform import azurerm_resource_group.main "$RG_ID" 2>/dev/null || true
+          fi
+
+          # PostgreSQL Flexible Server
+          PG_ID="/subscriptions/$SUB_ID/resourceGroups/$RG/providers/Microsoft.DBforPostgreSQL/flexibleServers/burger-builder-db"
+          PG_EXISTS=$(az postgres flexible-server show --resource-group "$RG" --name "burger-builder-db" --query id -o tsv 2>/dev/null || echo "")
+          if [ -n "$PG_EXISTS" ]; then
+            terraform import azurerm_postgresql_flexible_server.main "$PG_ID" 2>/dev/null || true
           fi
 
       # ── Validate ──────────────────────────────────────────
