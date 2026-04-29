@@ -530,6 +530,15 @@ jobs:
             terraform import azurerm_mssql_server.main "$SQL_ID" 2>/dev/null || true
           fi
 
+      # ── Release stale state lock if exists ───────────────
+      - name: Release State Lock
+        run: |
+          az storage blob lease break \
+            --account-name "$TF_STATE_STORAGE" \
+            --container-name tfstate \
+            --blob-name "devops-project-2-group-2.tfstate" \
+            --output none 2>/dev/null || true
+
       # ── Validate ──────────────────────────────────────────
       - name: Terraform Validate
         working-directory: infra
