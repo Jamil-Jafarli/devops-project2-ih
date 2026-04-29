@@ -72,6 +72,18 @@ jobs:
             --auth-mode login \
             --output none
 
+          # Grant the SP "Storage Blob Data Contributor" so Terraform can read/write state
+          STORAGE_ID=$(az storage account show \
+            --name "$TF_STATE_STORAGE" \
+            --resource-group "$TF_STATE_RG" \
+            --query id -o tsv)
+
+          az role assignment create \
+            --assignee "$ARM_CLIENT_ID" \
+            --role "Storage Blob Data Contributor" \
+            --scope "$STORAGE_ID" \
+            --output none 2>/dev/null || true
+
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
         with:
