@@ -39,7 +39,6 @@ jobs:
   terraform:
     name: Terraform
     runs-on: ubuntu-latest
-    environment: production
 
     steps:
       # ── Azure login (OIDC) ────────────────────────────────
