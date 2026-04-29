@@ -35,6 +35,9 @@ env:
   TF_STATE_RG:      "devops-project-2-group-2"
   TF_STATE_STORAGE: ${{ secrets.TF_STATE_STORAGE }}
 
+  # Terraform variables passed via environment
+  TF_VAR_db_password: ${{ secrets.DB_PASSWORD }}
+
 jobs:
   terraform:
     name: Terraform
@@ -115,6 +118,12 @@ jobs:
 
           provider "random" {}
           provider "tls" {}
+
+          variable "db_password" {
+            description = "PostgreSQL administrator password"
+            type        = string
+            sensitive   = true
+          }
 
           locals {
             rg_name  = "devops-project-2-group-2"
@@ -348,12 +357,6 @@ jobs:
             registration_enabled  = false
           }
 
-          resource "random_password" "db_password" {
-            length           = 20
-            special          = true
-            override_special = "!#%&*-_=+<>?"
-          }
-
           resource "random_password" "vm_password" {
             length           = 20
             special          = true
@@ -368,13 +371,20 @@ jobs:
             delegated_subnet_id           = azurerm_subnet.db.id
             private_dns_zone_id           = azurerm_private_dns_zone.postgres.id
             public_network_access_enabled = false
-            administrator_login           = "pgadmin"
-            administrator_password        = random_password.db_password.result
+            administrator_login           = "postgres"
+            administrator_password        = var.db_password
             storage_mb                    = 32768
             sku_name                      = "B_Standard_B1ms"
             zone                          = "2"
 
             depends_on = [azurerm_private_dns_zone_virtual_network_link.postgres]
+          }
+
+          resource "azurerm_postgresql_flexible_server_database" "app" {
+            name      = "burgerbuilder"
+            server_id = azurerm_postgresql_flexible_server.main.id
+            charset   = "UTF8"
+            collation = "en_US.utf8"
           }
 
           resource "azurerm_application_gateway" "main" {
@@ -476,12 +486,6 @@ jobs:
           output "vm_ssh_private_key" {
             description = "SSH private key – never commit to source control"
             value       = tls_private_key.vm_ssh.private_key_pem
-            sensitive   = true
-          }
-
-          output "db_password" {
-            description = "PostgreSQL admin password"
-            value       = random_password.db_password.result
             sensitive   = true
           }
 
