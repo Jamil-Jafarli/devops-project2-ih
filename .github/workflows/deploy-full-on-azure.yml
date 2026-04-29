@@ -72,17 +72,13 @@ jobs:
             --auth-mode login \
             --output none
 
-          # Grant the SP "Storage Blob Data Contributor" so Terraform can read/write state
-          STORAGE_ID=$(az storage account show \
-            --name "$TF_STATE_STORAGE" \
+          # Export storage key so Terraform backend can authenticate without RBAC delays
+          STORAGE_KEY=$(az storage account keys list \
+            --account-name "$TF_STATE_STORAGE" \
             --resource-group "$TF_STATE_RG" \
-            --query id -o tsv)
+            --query "[0].value" -o tsv)
 
-          az role assignment create \
-            --assignee "$ARM_CLIENT_ID" \
-            --role "Storage Blob Data Contributor" \
-            --scope "$STORAGE_ID" \
-            --output none 2>/dev/null || true
+          echo "ARM_ACCESS_KEY=$STORAGE_KEY" >> "$GITHUB_ENV"
 
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
@@ -478,8 +474,7 @@ jobs:
             -backend-config="resource_group_name=$TF_STATE_RG" \
             -backend-config="storage_account_name=$TF_STATE_STORAGE" \
             -backend-config="container_name=tfstate" \
-            -backend-config="key=devops-project-2-group-2.tfstate" \
-            -backend-config="use_azuread_auth=true"
+            -backend-config="key=devops-project-2-group-2.tfstate"
 
       # ── Validate ──────────────────────────────────────────
       - name: Terraform Validate
