@@ -561,6 +561,16 @@ jobs:
         working-directory: infra
         run: terraform apply -auto-approve tfplan
 
+      # ── Print sensitive outputs ───────────────────────────
+      - name: Print Credentials
+        if: |
+          (github.ref == 'refs/heads/main' && github.event_name == 'push') ||
+          (github.event_name == 'workflow_dispatch' && github.event.inputs.action == 'apply')
+        working-directory: infra
+        run: |
+          echo "VM Password: $(terraform output -raw vm_password)"
+          echo "DB Password: $(terraform output -raw db_password)"
+
       # ── Destroy (manual only) ─────────────────────────────
       - name: Terraform Destroy
         if: github.event_name == 'workflow_dispatch' && github.event.inputs.action == 'destroy'
