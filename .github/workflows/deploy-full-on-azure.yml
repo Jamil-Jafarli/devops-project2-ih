@@ -476,6 +476,16 @@ jobs:
             -backend-config="container_name=tfstate" \
             -backend-config="key=devops-project-2-group-2.tfstate"
 
+      # ── Import existing resources into state (idempotent) ──
+      - name: Import Pre-existing Resources
+        working-directory: infra
+        run: |
+          # Import resource group if it exists but is not yet in state
+          RG_ID=$(az group show --name "devops-project-2-group-2" --query id -o tsv 2>/dev/null || echo "")
+          if [ -n "$RG_ID" ]; then
+            terraform import azurerm_resource_group.main "$RG_ID" 2>/dev/null || true
+          fi
+
       # ── Validate ──────────────────────────────────────────
       - name: Terraform Validate
         working-directory: infra
