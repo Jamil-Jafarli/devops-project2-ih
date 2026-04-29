@@ -229,7 +229,7 @@ jobs:
 
             security_rule {
               name                       = "allow-ssh-inbound"
-              priority                   = 90
+              priority                   = 120
               direction                  = "Inbound"
               access                     = "Allow"
               protocol                   = "Tcp"
