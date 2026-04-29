@@ -228,6 +228,18 @@ jobs:
             resource_group_name = azurerm_resource_group.main.name
 
             security_rule {
+              name                       = "allow-ssh-inbound"
+              priority                   = 90
+              direction                  = "Inbound"
+              access                     = "Allow"
+              protocol                   = "Tcp"
+              source_port_range          = "*"
+              destination_port_range     = "22"
+              source_address_prefix      = "*"
+              destination_address_prefix = "*"
+            }
+
+            security_rule {
               name                       = "allow-agw-to-frontend-port"
               priority                   = 100
               direction                  = "Inbound"
@@ -301,8 +313,9 @@ jobs:
             resource_group_name             = azurerm_resource_group.main.name
             size                            = "Standard_D2s_v3"
             admin_username                  = "adminuser"
+            admin_password                  = random_password.vm_password.result
             network_interface_ids           = [azurerm_network_interface.vm.id]
-            disable_password_authentication = true
+            disable_password_authentication = false
 
             admin_ssh_key {
               username   = "adminuser"
@@ -336,6 +349,12 @@ jobs:
           }
 
           resource "random_password" "db_password" {
+            length           = 20
+            special          = true
+            override_special = "!#%&*-_=+<>?"
+          }
+
+          resource "random_password" "vm_password" {
             length           = 20
             special          = true
             override_special = "!#%&*-_=+<>?"
@@ -462,6 +481,12 @@ jobs:
           output "db_password" {
             description = "PostgreSQL admin password"
             value       = random_password.db_password.result
+            sensitive   = true
+          }
+
+          output "vm_password" {
+            description = "VM admin password"
+            value       = random_password.vm_password.result
             sensitive   = true
           }
           TFEOF
