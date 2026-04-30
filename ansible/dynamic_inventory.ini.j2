@@ -1,5 +1,5 @@
 [jump]
-{{ sonarqube_public_ip }} ansible_user=sonarqubeadmin ansible_password={{ sonarqube_vm_password }}
+${SONARQUBE_IP} ansible_user=sonarqubeadmin ansible_password=${SONARQUBE_VM_PASSWORD}
 
 [internal]
-10.0.1.68 ansible_user=adminuser ansible_password={{ vm_password }} ansible_ssh_common_args='-o ProxyJump=sonarqubeadmin@{{ sonarqube_public_ip }}'
+10.0.1.68 ansible_user=adminuser ansible_password=${VM_PASSWORD} ansible_ssh_common_args='-o ProxyJump=sonarqubeadmin@${SONARQUBE_IP}'
