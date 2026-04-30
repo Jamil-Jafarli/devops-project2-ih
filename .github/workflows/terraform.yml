@@ -44,6 +44,8 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
       # ── Azure login (OIDC) ────────────────────────────────
       - name: Azure Login
         uses: azure/login@v2
