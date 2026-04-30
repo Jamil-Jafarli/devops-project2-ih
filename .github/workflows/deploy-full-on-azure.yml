@@ -672,6 +672,20 @@ jobs:
         working-directory: infra
         run: terraform apply -auto-approve tfplan
 
+      # ── Sync SQL Server password with DB_PASSWORD secret ────
+      # terraform import does not apply administrator_login_password.
+      # This step forces the password to match the secret after every apply.
+      - name: Sync SQL Server Password
+        if: |
+          steps.plan.outcome == 'success' &&
+          ((github.ref == 'refs/heads/main' && github.event_name == 'push') ||
+          (github.event_name == 'workflow_dispatch' && github.event.inputs.action == 'apply'))
+        run: |
+          az sql server update \
+            --resource-group "devops-project-2-group-2" \
+            --name "burger-builder-db" \
+            --admin-password "${{ secrets.DB_PASSWORD }}"
+
       # ── Print sensitive outputs ───────────────────────────
       - name: Print Credentials
         if: |
