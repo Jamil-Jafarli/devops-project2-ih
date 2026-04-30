@@ -1,0 +1,8 @@
+---
+- name: Deploy Burger Builder Application
+  hosts: vm
+  become: true
+  vars_files:
+    - roles/app/vars/main.yml
+  roles:
+    - app

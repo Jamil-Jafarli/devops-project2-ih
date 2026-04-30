@@ -24,3 +24,11 @@ jobs:
     with:
       action: ${{ github.event.inputs.action }}
     secrets: inherit
+
+  call-ansible:
+    uses: ./.github/workflows/ansible.yml
+    needs: call-terraform
+    with:
+      db_password: ${{ secrets.DB_PASSWORD }}
+      vm_password: ${{ secrets.VM_PASSWORD }}
+    secrets: inherit

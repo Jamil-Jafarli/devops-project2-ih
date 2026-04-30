@@ -1,0 +1,9 @@
+# Vars for Burger Builder App
+db_name: burgerbuilder
+db_username: dbadmin
+# db_password secret-dən gələcək
+app_user: adminuser
+repo_url: https://github.com/Jamil-Jafarli/devops-project2-ih.git
+app_dir: /home/adminuser/devops-project2-ih
+server_port: 8080
+cors_origins: "http://52.236.138.163"

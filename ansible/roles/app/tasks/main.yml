@@ -1,0 +1,75 @@
+# Main tasks for Burger Builder App deployment
+- name: Update apt cache
+  apt:
+    update_cache: yes
+    cache_valid_time: 3600
+
+- name: Install OpenJDK 21
+  apt:
+    name: openjdk-21-jdk
+    state: present
+
+- name: Install Maven
+  apt:
+    name: maven
+    state: present
+
+- name: Add NodeSource setup script
+  shell: curl -fsSL https://deb.nodesource.com/setup_22.x | bash -
+  args:
+    creates: /etc/apt/sources.list.d/nodesource.list
+
+- name: Install Node.js 22
+  apt:
+    name: nodejs
+    state: present
+    update_cache: yes
+
+- name: Clone application repository
+  git:
+    repo: "{{ repo_url }}"
+    dest: "{{ app_dir }}"
+    version: main
+    force: yes
+  become_user: "{{ app_user }}"
+
+- name: Install frontend npm dependencies
+  community.general.npm:
+    path: "{{ app_dir }}/frontend"
+  become_user: "{{ app_user }}"
+
+- name: Install Vite locally
+  community.general.npm:
+    name: vite
+    path: "{{ app_dir }}/frontend"
+  become_user: "{{ app_user }}"
+
+- name: Write external application.properties for backend
+  template:
+    src: application.properties.j2
+    dest: "{{ app_dir }}/backend/application.properties"
+    owner: "{{ app_user }}"
+    mode: '0600'
+
+- name: Create backend.service
+  template:
+    src: backend.service.j2
+    dest: /etc/systemd/system/backend.service
+
+- name: Create frontend.service
+  template:
+    src: frontend.service.j2
+    dest: /etc/systemd/system/frontend.service
+
+- name: Reload systemd daemon, enable and start backend
+  systemd:
+    name: backend
+    daemon_reload: yes
+    enabled: yes
+    state: started
+
+- name: Enable and start frontend
+  systemd:
+    name: frontend
+    enabled: yes
+    state: started
