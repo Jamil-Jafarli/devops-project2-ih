@@ -392,14 +392,81 @@ jobs:
             }
           }
 
+          # WAF Policy: /api/* yalnız aşağıdakı IP-lərdən əlçatan olsun.
+          # XƏBƏRDARLIQ: Brauzer-əsaslı SPA istifadəçiləri xarici IP ilə gəlir;
+          # onların /api/* çağırışları da bloklanacaq. Yalnız server-to-server
+          # və ya VPN/VNet daxili istifadə üçün uyğundur.
+          resource "azurerm_web_application_firewall_policy" "main" {
+            name                = "burger-builder-waf-policy"
+            resource_group_name = azurerm_resource_group.main.name
+            location            = azurerm_resource_group.main.location
+
+            # Custom rule: /api/* ünvanına yalnız icazəli IP-lərdən icazə ver
+            custom_rules {
+              name      = "BlockAPIFromInternet"
+              priority  = 1
+              rule_type = "MatchRule"
+              action    = "Block"
+
+              # Şərt 1: URI /api/ ilə başlayır
+              match_conditions {
+                match_variables {
+                  variable_name = "RequestUri"
+                }
+                operator           = "BeginsWith"
+                negation_condition = false
+                match_values       = ["/api/"]
+              }
+
+              # Şərt 2: Mənbə IP icazəli siyahıda DEYİL → blokla
+              match_conditions {
+                match_variables {
+                  variable_name = "RemoteAddr"
+                }
+                operator           = "IPMatch"
+                negation_condition = true
+                match_values       = ["10.0.1.0/24", "52.236.138.163"]
+              }
+            }
+
+            managed_rules {
+              managed_rule_set {
+                type    = "OWASP"
+                version = "3.2"
+
+                rule_group_override {
+                  rule_group_name = "REQUEST-920-PROTOCOL-ENFORCEMENT"
+                  rule {
+                    id      = "920300"
+                    enabled = false
+                  }
+                  rule {
+                    id      = "920320"
+                    enabled = false
+                  }
+                }
+              }
+            }
+
+            policy_settings {
+              enabled                     = true
+              mode                        = "Prevention"
+              file_upload_limit_in_mb     = 30
+              max_request_body_size_in_kb = 128
+              request_body_check          = true
+            }
+          }
+
           resource "azurerm_application_gateway" "main" {
             name                = "burger-builder-agw"
             resource_group_name = azurerm_resource_group.main.name
             location            = azurerm_resource_group.main.location
 
+            firewall_policy_id = azurerm_web_application_firewall_policy.main.id
+
             sku {
-              name     = "Standard_v2"
-              tier     = "Standard_v2"
+              name     = "WAF_v2"
+              tier     = "WAF_v2"
               capacity = 1
             }
 
