@@ -2,7 +2,7 @@ resource "azurerm_linux_virtual_machine" "sonarqube" {
   name                = "burger-builder-sonarqube"
   resource_group_name = local.rg_name
   location            = local.location
-  size                = "Standard_B1s"
+  size                = "Standard_B2s"
   admin_username      = "sonarqubeadmin"
   network_interface_ids = [azurerm_network_interface.sonarqube.id]
   admin_password      = var.sonarqube_vm_password
