@@ -22,12 +22,6 @@ jobs:
           python -m pip install --upgrade pip
           pip install ansible
 
-      - name: Install Terraform
-        uses: hashicorp/setup-terraform@v3
-        
-      - name: Terraform Init
-        run: terraform -chdir=terraform init -input=false
-
       - name: Get Sonarqube Public IP
         id: get_ip
         run: |
