@@ -1,3 +1,7 @@
+output "sonarqube_vm_public_ip" {
+  description = "Public IP of the Sonarqube VM"
+  value       = azurerm_public_ip.sonarqube.ip_address
+}
 output "sonarqube_vm_private_ip" {
   description = "Private IP of the Sonarqube VM"
   value       = azurerm_network_interface.sonarqube.private_ip_address
