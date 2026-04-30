@@ -266,13 +266,13 @@ jobs:
 
       # ── Validate ──────────────────────────────────────────
       - name: Terraform Validate
-          working-directory: terraform
+        working-directory: terraform
         run: terraform validate
 
       # ── Plan ──────────────────────────────────────────────
       - name: Terraform Plan
         id: plan
-          working-directory: terraform
+        working-directory: terraform
         shell: bash
         run: |
           set -o pipefail
