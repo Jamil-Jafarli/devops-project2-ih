@@ -13,6 +13,10 @@ on:
           - apply
           - destroy
   workflow_call:
+    inputs:
+      action:
+        required: true
+        type: string
 
 # Required for OIDC token issuance to authenticate with Azure
 permissions:
