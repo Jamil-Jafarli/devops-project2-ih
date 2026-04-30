@@ -22,11 +22,20 @@ jobs:
           python -m pip install --upgrade pip
           pip install ansible
 
-      - name: Run Ansible Playbook
+      - name: Get Sonarqube Public IP
+        id: get_ip
+        run: |
+          echo "SONARQUBE_IP=$(terraform -chdir=terraform output -raw sonarqube_vm_public_ip)" >> $GITHUB_ENV
+
+      - name: Render dynamic inventory
+        run: |
+          export SONARQUBE_IP=${{ env.SONARQUBE_IP }}
+          export SONARQUBE_VM_PASSWORD=${{ secrets.SONARQUBE_VM_PASSWORD }}
+          export VM_PASSWORD=${{ secrets.VM_PASSWORD }}
+          envsubst < ansible/dynamic_inventory.ini.j2 > ansible/dynamic_inventory.ini
+
+      - name: Run Ansible Playbook (bridge)
         env:
           ANSIBLE_HOST_KEY_CHECKING: 'False'
-          DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
-          VM_PASSWORD: ${{ secrets.VM_PASSWORD }}
         run: |
-          ansible-playbook ansible/site.yml -i ansible/inventory.ini \
-            --extra-vars "db_password=$DB_PASSWORD db_fqdn=burger-builder-db.database.windows.net ansible_password=$VM_PASSWORD vm_password=$VM_PASSWORD"
+          ansible-playbook -i ansible/dynamic_inventory.ini ansible/playbook_bridge.yml
