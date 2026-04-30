@@ -12,6 +12,7 @@ on:
           - plan
           - apply
           - destroy
+  workflow_call:
 
 # Required for OIDC token issuance to authenticate with Azure
 permissions:

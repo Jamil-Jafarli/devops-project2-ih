@@ -2,8 +2,17 @@ name: Terraform – Burger Builder Infrastructure
 
 on:
   workflow_dispatch:
+    inputs:
+      action:
+        description: "Terraform action to run"
+        required: true
+        default: "plan"
+        type: choice
+        options:
+          - plan
+          - apply
+          - destroy
 
-jobs:
   call-terraform:
     uses: ./.github/workflows/terraform.yml
     secrets: inherit
