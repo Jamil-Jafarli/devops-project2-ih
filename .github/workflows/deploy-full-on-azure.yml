@@ -539,6 +539,29 @@ jobs:
             --blob-name "devops-project-2-group-2.tfstate" \
             --output none 2>/dev/null || true
 
+      # ── Remove NIC association from AGW backend pools ─────
+      # Azure disallows two pools referencing the same NIC IP config.
+      # This detaches the NIC from both pools so Terraform can apply
+      # IP-address-based pools cleanly. Safe to run if AGW doesn't exist yet.
+      - name: Detach NIC from AGW Backend Pools
+        run: |
+          RG="devops-project-2-group-2"
+          AGW_EXISTS=$(az network application-gateway show \
+            --name burger-builder-agw \
+            --resource-group "$RG" \
+            --query name -o tsv 2>/dev/null || echo "")
+
+          if [ -n "$AGW_EXISTS" ]; then
+            for POOL in frontend-backend-pool api-backend-pool; do
+              az network nic ip-config address-pool remove \
+                --nic-name burger-builder-nic \
+                --ip-config-name internal \
+                --resource-group "$RG" \
+                --address-pool "$POOL" \
+                --gateway-name burger-builder-agw 2>/dev/null || true
+            done
+          fi
+
       # ── Validate ──────────────────────────────────────────
       - name: Terraform Validate
         working-directory: infra
