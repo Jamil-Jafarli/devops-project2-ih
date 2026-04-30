@@ -13,6 +13,9 @@ on:
           - apply
           - destroy
 
+jobs:
   call-terraform:
     uses: ./.github/workflows/terraform.yml
+    with:
+      action: ${{ github.event.inputs.action }}
     secrets: inherit
