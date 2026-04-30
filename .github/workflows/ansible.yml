@@ -1,12 +1,10 @@
+on:
+
 name: Ansible Deploy
 
-on:
-  workflow_dispatch:
-    inputs:
-      db_password:
-        description: 'Database password'
-        required: true
 
+  workflow_call:
+  workflow_dispatch:
 jobs:
   deploy:
     runs-on: ubuntu-latest
