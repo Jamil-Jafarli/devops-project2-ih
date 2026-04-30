@@ -1,12 +1,6 @@
 name: Terraform – Burger Builder Infrastructure
 
 on:
-  push:
-    branches:
-      - main
-  pull_request:
-    branches:
-      - main
   workflow_dispatch:
     inputs:
       action:
