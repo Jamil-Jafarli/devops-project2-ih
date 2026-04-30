@@ -37,6 +37,7 @@ env:
 
   # Terraform variables passed via environment
   TF_VAR_db_password: ${{ secrets.DB_PASSWORD }}
+  TF_VAR_vm_password: ${{ secrets.VM_PASSWORD }}
 
 jobs:
   terraform:
@@ -121,6 +122,12 @@ jobs:
 
           variable "db_password" {
             description = "SQL Server administrator password"
+            type        = string
+            sensitive   = true
+          }
+
+          variable "vm_password" {
+            description = "VM administrator password"
             type        = string
             sensitive   = true
           }
@@ -315,7 +322,7 @@ jobs:
             resource_group_name             = azurerm_resource_group.main.name
             size                            = "Standard_D2s_v3"
             admin_username                  = "adminuser"
-            admin_password                  = random_password.vm_password.result
+            admin_password                  = var.vm_password
             network_interface_ids           = [azurerm_network_interface.vm.id]
             disable_password_authentication = false
 
@@ -348,12 +355,6 @@ jobs:
             virtual_network_id    = azurerm_virtual_network.main.id
             resource_group_name   = azurerm_resource_group.main.name
             registration_enabled  = false
-          }
-
-          resource "random_password" "vm_password" {
-            length           = 20
-            special          = true
-            override_special = "!#%&*-_=+<>?"
           }
 
           resource "azurerm_mssql_server" "main" {
@@ -523,7 +524,7 @@ jobs:
 
           output "vm_password" {
             description = "VM admin password"
-            value       = random_password.vm_password.result
+            value       = var.vm_password
             sensitive   = true
           }
           TFEOF
