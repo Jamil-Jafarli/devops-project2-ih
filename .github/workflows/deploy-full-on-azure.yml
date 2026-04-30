@@ -686,28 +686,26 @@ jobs:
 
 
 
-            # Subnet-NSG Association - frontend (idempotent)
+            # Subnet-NSG Association - frontend (idempotent, correct import ID)
             FRONTEND_ASSOC_NSG=$(az network vnet subnet show --resource-group "$RG" --vnet-name "burger-builder-vnet" --name "agw-subnet" --query "networkSecurityGroup.id" -o tsv 2>/dev/null || echo "")
-            ASSOC_ID="$SUBNET_AGW_ID|$FRONTEND_ASSOC_NSG"
             STATE_ID=$(terraform state show -no-color azurerm_subnet_network_security_group_association.frontend 2>/dev/null | grep '^id\s*=\s*' | awk -F'=' '{print $2}' | xargs || echo "")
-            if [ "$STATE_ID" = "$ASSOC_ID" ]; then
+            if [ "$STATE_ID" = "$SUBNET_AGW_ID" ]; then
               echo "Frontend association already imported and matches Azure. Skipping import."
             elif [ -n "$FRONTEND_ASSOC_NSG" ]; then
-              echo "Importing frontend association: $ASSOC_ID"
-              terraform import azurerm_subnet_network_security_group_association.frontend "$ASSOC_ID" || echo "Import failed for frontend association"
+              echo "Importing frontend association: $SUBNET_AGW_ID"
+              terraform import azurerm_subnet_network_security_group_association.frontend "$SUBNET_AGW_ID" 2>&1 || echo "Import failed for frontend association"
             else
               echo "No NSG associated with agw-subnet"
             fi
 
-            # Subnet-NSG Association - backend (idempotent)
+            # Subnet-NSG Association - backend (idempotent, correct import ID)
             BACKEND_ASSOC_NSG=$(az network vnet subnet show --resource-group "$RG" --vnet-name "burger-builder-vnet" --name "vm-subnet" --query "networkSecurityGroup.id" -o tsv 2>/dev/null || echo "")
-            ASSOC_ID="$SUBNET_VM_ID|$BACKEND_ASSOC_NSG"
             STATE_ID=$(terraform state show -no-color azurerm_subnet_network_security_group_association.backend 2>/dev/null | grep '^id\s*=\s*' | awk -F'=' '{print $2}' | xargs || echo "")
-            if [ "$STATE_ID" = "$ASSOC_ID" ]; then
+            if [ "$STATE_ID" = "$SUBNET_VM_ID" ]; then
               echo "Backend association already imported and matches Azure. Skipping import."
             elif [ -n "$BACKEND_ASSOC_NSG" ]; then
-              echo "Importing backend association: $ASSOC_ID"
-              terraform import azurerm_subnet_network_security_group_association.backend "$ASSOC_ID" || echo "Import failed for backend association"
+              echo "Importing backend association: $SUBNET_VM_ID"
+              terraform import azurerm_subnet_network_security_group_association.backend "$SUBNET_VM_ID" 2>&1 || echo "Import failed for backend association"
             else
               echo "No NSG associated with vm-subnet"
             fi
