@@ -584,92 +584,130 @@ jobs:
           SUB_ID="$ARM_SUBSCRIPTION_ID"
           RG="devops-project-2-group-2"
 
-          # Resource Group
+
+          # Resource Group (idempotent)
           RG_ID=$(az group show --name "$RG" --query id -o tsv 2>/dev/null || echo "")
-          if [ -n "$RG_ID" ]; then
+          STATE_ID=$(terraform state show -no-color azurerm_resource_group.main 2>/dev/null | grep '^id\s*=\s*' | awk -F'=' '{print $2}' | xargs || echo "")
+          if [ "$STATE_ID" = "$RG_ID" ]; then
+            echo "Resource group already imported and matches Azure. Skipping import."
+          elif [ -n "$RG_ID" ]; then
             terraform import azurerm_resource_group.main "$RG_ID" 2>/dev/null || true
           fi
 
-          # Azure SQL Server
+          # Azure SQL Server (idempotent)
           SQL_ID="/subscriptions/$SUB_ID/resourceGroups/$RG/providers/Microsoft.Sql/servers/burger-builder-db"
           SQL_EXISTS=$(az sql server show --resource-group "$RG" --name "burger-builder-db" --query id -o tsv 2>/dev/null || echo "")
-          if [ -n "$SQL_EXISTS" ]; then
+          STATE_ID=$(terraform state show -no-color azurerm_mssql_server.main 2>/dev/null | grep '^id\s*=\s*' | awk -F'=' '{print $2}' | xargs || echo "")
+          if [ "$STATE_ID" = "$SQL_ID" ]; then
+            echo "SQL Server already imported and matches Azure. Skipping import."
+          elif [ -n "$SQL_EXISTS" ]; then
             terraform import azurerm_mssql_server.main "$SQL_ID" 2>/dev/null || true
           fi
 
-          # Virtual Network
+          # Virtual Network (idempotent)
           VNET_ID="/subscriptions/$SUB_ID/resourceGroups/$RG/providers/Microsoft.Network/virtualNetworks/burger-builder-vnet"
           VNET_EXISTS=$(az network vnet show --resource-group "$RG" --name "burger-builder-vnet" --query id -o tsv 2>/dev/null || echo "")
-          if [ -n "$VNET_EXISTS" ]; then
+          STATE_ID=$(terraform state show -no-color azurerm_virtual_network.main 2>/dev/null | grep '^id\s*=\s*' | awk -F'=' '{print $2}' | xargs || echo "")
+          if [ "$STATE_ID" = "$VNET_ID" ]; then
+            echo "VNet already imported and matches Azure. Skipping import."
+          elif [ -n "$VNET_EXISTS" ]; then
             terraform import azurerm_virtual_network.main "$VNET_ID" 2>/dev/null || true
           fi
 
-          # NSG - frontend
+          # NSG - frontend (idempotent)
           NSG_FRONTEND_ID="/subscriptions/$SUB_ID/resourceGroups/$RG/providers/Microsoft.Network/networkSecurityGroups/frontend-nsg"
           NSG_FRONTEND_EXISTS=$(az network nsg show --resource-group "$RG" --name "frontend-nsg" --query id -o tsv 2>/dev/null || echo "")
-          if [ -n "$NSG_FRONTEND_EXISTS" ]; then
+          STATE_ID=$(terraform state show -no-color azurerm_network_security_group.frontend 2>/dev/null | grep '^id\s*=\s*' | awk -F'=' '{print $2}' | xargs || echo "")
+          if [ "$STATE_ID" = "$NSG_FRONTEND_ID" ]; then
+            echo "Frontend NSG already imported and matches Azure. Skipping import."
+          elif [ -n "$NSG_FRONTEND_EXISTS" ]; then
             terraform import azurerm_network_security_group.frontend "$NSG_FRONTEND_ID" 2>/dev/null || true
           fi
 
-          # NSG - backend
+          # NSG - backend (idempotent)
           NSG_BACKEND_ID="/subscriptions/$SUB_ID/resourceGroups/$RG/providers/Microsoft.Network/networkSecurityGroups/backend-nsg"
           NSG_BACKEND_EXISTS=$(az network nsg show --resource-group "$RG" --name "backend-nsg" --query id -o tsv 2>/dev/null || echo "")
-          if [ -n "$NSG_BACKEND_EXISTS" ]; then
+          STATE_ID=$(terraform state show -no-color azurerm_network_security_group.backend 2>/dev/null | grep '^id\s*=\s*' | awk -F'=' '{print $2}' | xargs || echo "")
+          if [ "$STATE_ID" = "$NSG_BACKEND_ID" ]; then
+            echo "Backend NSG already imported and matches Azure. Skipping import."
+          elif [ -n "$NSG_BACKEND_EXISTS" ]; then
             terraform import azurerm_network_security_group.backend "$NSG_BACKEND_ID" 2>/dev/null || true
           fi
 
-          # Private DNS Zone
+          # Private DNS Zone (idempotent)
           DNS_ZONE_ID="/subscriptions/$SUB_ID/resourceGroups/$RG/providers/Microsoft.Network/privateDnsZones/privatelink.database.windows.net"
           DNS_ZONE_EXISTS=$(az network private-dns zone show --resource-group "$RG" --name "privatelink.database.windows.net" --query id -o tsv 2>/dev/null || echo "")
-          if [ -n "$DNS_ZONE_EXISTS" ]; then
+          STATE_ID=$(terraform state show -no-color azurerm_private_dns_zone.sql 2>/dev/null | grep '^id\s*=\s*' | awk -F'=' '{print $2}' | xargs || echo "")
+          if [ "$STATE_ID" = "$DNS_ZONE_ID" ]; then
+            echo "Private DNS zone already imported and matches Azure. Skipping import."
+          elif [ -n "$DNS_ZONE_EXISTS" ]; then
             terraform import azurerm_private_dns_zone.sql "$DNS_ZONE_ID" 2>/dev/null || true
           fi
 
-          # Subnet - agw
+          # Subnet - agw (idempotent)
           SUBNET_AGW_ID="/subscriptions/$SUB_ID/resourceGroups/$RG/providers/Microsoft.Network/virtualNetworks/burger-builder-vnet/subnets/agw-subnet"
           SUBNET_AGW_EXISTS=$(az network vnet subnet show --resource-group "$RG" --vnet-name "burger-builder-vnet" --name "agw-subnet" --query id -o tsv 2>/dev/null || echo "")
-          if [ -n "$SUBNET_AGW_EXISTS" ]; then
+          STATE_ID=$(terraform state show -no-color azurerm_subnet.agw 2>/dev/null | grep '^id\s*=\s*' | awk -F'=' '{print $2}' | xargs || echo "")
+          if [ "$STATE_ID" = "$SUBNET_AGW_ID" ]; then
+            echo "AGW subnet already imported and matches Azure. Skipping import."
+          elif [ -n "$SUBNET_AGW_EXISTS" ]; then
             terraform import azurerm_subnet.agw "$SUBNET_AGW_ID" 2>/dev/null || true
           fi
 
-          # Subnet - vm
+          # Subnet - vm (idempotent)
           SUBNET_VM_ID="/subscriptions/$SUB_ID/resourceGroups/$RG/providers/Microsoft.Network/virtualNetworks/burger-builder-vnet/subnets/vm-subnet"
           SUBNET_VM_EXISTS=$(az network vnet subnet show --resource-group "$RG" --vnet-name "burger-builder-vnet" --name "vm-subnet" --query id -o tsv 2>/dev/null || echo "")
-          if [ -n "$SUBNET_VM_EXISTS" ]; then
+          STATE_ID=$(terraform state show -no-color azurerm_subnet.vm 2>/dev/null | grep '^id\s*=\s*' | awk -F'=' '{print $2}' | xargs || echo "")
+          if [ "$STATE_ID" = "$SUBNET_VM_ID" ]; then
+            echo "VM subnet already imported and matches Azure. Skipping import."
+          elif [ -n "$SUBNET_VM_EXISTS" ]; then
             terraform import azurerm_subnet.vm "$SUBNET_VM_ID" 2>/dev/null || true
           fi
 
-          # Subnet - db
+          # Subnet - db (idempotent)
           SUBNET_DB_ID="/subscriptions/$SUB_ID/resourceGroups/$RG/providers/Microsoft.Network/virtualNetworks/burger-builder-vnet/subnets/db-subnet"
           SUBNET_DB_EXISTS=$(az network vnet subnet show --resource-group "$RG" --vnet-name "burger-builder-vnet" --name "db-subnet" --query id -o tsv 2>/dev/null || echo "")
-          if [ -n "$SUBNET_DB_EXISTS" ]; then
+          STATE_ID=$(terraform state show -no-color azurerm_subnet.db 2>/dev/null | grep '^id\s*=\s*' | awk -F'=' '{print $2}' | xargs || echo "")
+          if [ "$STATE_ID" = "$SUBNET_DB_ID" ]; then
+            echo "DB subnet already imported and matches Azure. Skipping import."
+          elif [ -n "$SUBNET_DB_EXISTS" ]; then
             terraform import azurerm_subnet.db "$SUBNET_DB_ID" 2>/dev/null || true
           fi
 
-          # Private DNS Zone VNet Link
+          # Private DNS Zone VNet Link (idempotent)
           DNS_VNET_LINK_ID="/subscriptions/$SUB_ID/resourceGroups/$RG/providers/Microsoft.Network/privateDnsZones/privatelink.database.windows.net/virtualNetworkLinks/sql-vnet-link"
           DNS_VNET_LINK_EXISTS=$(az network private-dns link vnet show --resource-group "$RG" --zone-name "privatelink.database.windows.net" --name "sql-vnet-link" --query id -o tsv 2>/dev/null || echo "")
-          if [ -n "$DNS_VNET_LINK_EXISTS" ]; then
+          STATE_ID=$(terraform state show -no-color azurerm_private_dns_zone_virtual_network_link.sql 2>/dev/null | grep '^id\s*=\s*' | awk -F'=' '{print $2}' | xargs || echo "")
+          if [ "$STATE_ID" = "$DNS_VNET_LINK_ID" ]; then
+            echo "Private DNS zone VNet link already imported and matches Azure. Skipping import."
+          elif [ -n "$DNS_VNET_LINK_EXISTS" ]; then
             terraform import azurerm_private_dns_zone_virtual_network_link.sql "$DNS_VNET_LINK_ID" 2>/dev/null || true
           fi
 
 
-            # Subnet-NSG Association - frontend
+
+            # Subnet-NSG Association - frontend (idempotent)
             FRONTEND_ASSOC_NSG=$(az network vnet subnet show --resource-group "$RG" --vnet-name "burger-builder-vnet" --name "agw-subnet" --query "networkSecurityGroup.id" -o tsv 2>/dev/null || echo "")
-            if [ -n "$FRONTEND_ASSOC_NSG" ]; then
-              echo "Importing frontend association: $SUBNET_AGW_ID|$FRONTEND_ASSOC_NSG"
-              terraform import azurerm_subnet_network_security_group_association.frontend "$SUBNET_AGW_ID|$FRONTEND_ASSOC_NSG" || echo "Import failed for frontend association"
-              terraform state show azurerm_subnet_network_security_group_association.frontend || echo "State show failed for frontend association"
+            ASSOC_ID="$SUBNET_AGW_ID|$FRONTEND_ASSOC_NSG"
+            STATE_ID=$(terraform state show -no-color azurerm_subnet_network_security_group_association.frontend 2>/dev/null | grep '^id\s*=\s*' | awk -F'=' '{print $2}' | xargs || echo "")
+            if [ "$STATE_ID" = "$ASSOC_ID" ]; then
+              echo "Frontend association already imported and matches Azure. Skipping import."
+            elif [ -n "$FRONTEND_ASSOC_NSG" ]; then
+              echo "Importing frontend association: $ASSOC_ID"
+              terraform import azurerm_subnet_network_security_group_association.frontend "$ASSOC_ID" || echo "Import failed for frontend association"
             else
               echo "No NSG associated with agw-subnet"
             fi
 
-            # Subnet-NSG Association - backend
+            # Subnet-NSG Association - backend (idempotent)
             BACKEND_ASSOC_NSG=$(az network vnet subnet show --resource-group "$RG" --vnet-name "burger-builder-vnet" --name "vm-subnet" --query "networkSecurityGroup.id" -o tsv 2>/dev/null || echo "")
-            if [ -n "$BACKEND_ASSOC_NSG" ]; then
-              echo "Importing backend association: $SUBNET_VM_ID|$BACKEND_ASSOC_NSG"
-              terraform import azurerm_subnet_network_security_group_association.backend "$SUBNET_VM_ID|$BACKEND_ASSOC_NSG" || echo "Import failed for backend association"
-              terraform state show azurerm_subnet_network_security_group_association.backend || echo "State show failed for backend association"
+            ASSOC_ID="$SUBNET_VM_ID|$BACKEND_ASSOC_NSG"
+            STATE_ID=$(terraform state show -no-color azurerm_subnet_network_security_group_association.backend 2>/dev/null | grep '^id\s*=\s*' | awk -F'=' '{print $2}' | xargs || echo "")
+            if [ "$STATE_ID" = "$ASSOC_ID" ]; then
+              echo "Backend association already imported and matches Azure. Skipping import."
+            elif [ -n "$BACKEND_ASSOC_NSG" ]; then
+              echo "Importing backend association: $ASSOC_ID"
+              terraform import azurerm_subnet_network_security_group_association.backend "$ASSOC_ID" || echo "Import failed for backend association"
             else
               echo "No NSG associated with vm-subnet"
             fi
