@@ -1,18 +1,18 @@
 ---
-- name: Jump host üzərində ilkin əməliyyatlar
+- name: Initial operations on jump host
   hosts: jump
   gather_facts: false
   tasks:
-    - name: "Jump host test: hostname"
-      ansible.builtin.shell: hostname
+    - name: Test hostname on jump host
+      shell: hostname
       register: jump_hostname
     - debug: var=jump_hostname.stdout
 
-- name: Daxili VM üzərində əməliyyatlar (jump host vasitəsilə)
+- name: Operations on internal VM (via jump host)
   hosts: internal
   gather_facts: false
   tasks:
-    - name: "Daxili VM test: hostname"
-      ansible.builtin.shell: hostname
+    - name: Test hostname on internal VM
+      shell: hostname
       register: internal_hostname
     - debug: var=internal_hostname.stdout

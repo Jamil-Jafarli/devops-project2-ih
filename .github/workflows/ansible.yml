@@ -25,14 +25,22 @@ jobs:
       - name: Get Sonarqube Public IP
         id: get_ip
         run: |
-          echo "SONARQUBE_IP=$(terraform -chdir=terraform output -raw sonarqube_vm_public_ip)" >> $GITHUB_ENV
+          SONARQUBE_IP=$(terraform -chdir=terraform output -raw sonarqube_vm_public_ip)
+          echo "SONARQUBE_IP=$SONARQUBE_IP" >> $GITHUB_ENV
+          echo "[DEBUG] Sonarqube Public IP: $SONARQUBE_IP"
+
+      - name: Debug Sonarqube Public IP
+        run: |
+          echo "[DEBUG] SONARQUBE_IP from env: $SONARQUBE_IP"
 
       - name: Render dynamic inventory
         run: |
           export SONARQUBE_IP=${{ env.SONARQUBE_IP }}
           export SONARQUBE_VM_PASSWORD=${{ secrets.SONARQUBE_VM_PASSWORD }}
           export VM_PASSWORD=${{ secrets.VM_PASSWORD }}
+          echo "[DEBUG] Rendering inventory with SONARQUBE_IP=$SONARQUBE_IP"
           envsubst < ansible/dynamic_inventory.ini.j2 > ansible/dynamic_inventory.ini
+          cat ansible/dynamic_inventory.ini
 
       - name: Run Ansible Playbook (bridge)
         env:
