@@ -1,0 +1,9 @@
+name: Terraform – Burger Builder Infrastructure
+
+on:
+  workflow_dispatch:
+
+jobs:
+  call-terraform:
+    uses: ./.github/workflows/terraform.yml
+    secrets: inherit
