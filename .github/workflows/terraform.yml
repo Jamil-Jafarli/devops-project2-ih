@@ -101,7 +101,7 @@ jobs:
 
       # ── Import existing resources into state (idempotent) ──
       - name: Import Pre-existing Resources
-        working-directory: infra
+        working-directory: terraform
         run: |
           SUB_ID="$ARM_SUBSCRIPTION_ID"
           RG="devops-project-2-group-2"
@@ -266,13 +266,13 @@ jobs:
 
       # ── Validate ──────────────────────────────────────────
       - name: Terraform Validate
-        working-directory: infra
+          working-directory: terraform
         run: terraform validate
 
       # ── Plan ──────────────────────────────────────────────
       - name: Terraform Plan
         id: plan
-        working-directory: infra
+          working-directory: terraform
         shell: bash
         run: |
           set -o pipefail
@@ -285,7 +285,7 @@ jobs:
         with:
           script: |
             const fs = require('fs');
-            const plan = fs.readFileSync('infra/plan_output.txt', 'utf8');
+              const plan = fs.readFileSync('terraform/plan_output.txt', 'utf8');
             const truncated = plan.length > 60000 ? plan.slice(0, 60000) + '\n... (truncated)' : plan;
             github.rest.issues.createComment({
               issue_number: context.issue.number,
