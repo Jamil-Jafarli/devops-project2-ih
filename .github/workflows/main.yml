@@ -19,11 +19,11 @@ permissions:
   pull-requests: write
 
 jobs:
-  # call-terraform:
-  #   uses: ./.github/workflows/terraform.yml
-  #   with:
-  #     action: ${{ github.event.inputs.action }}
-  #   secrets: inherit
+  call-terraform:
+    uses: ./.github/workflows/terraform.yml
+    with:
+      action: ${{ github.event.inputs.action }}
+    secrets: inherit
 
   call-ansible:
     uses: ./.github/workflows/ansible.yml
