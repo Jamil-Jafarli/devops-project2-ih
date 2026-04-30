@@ -392,42 +392,13 @@ jobs:
             }
           }
 
-          # WAF Policy: /api/* yalnız aşağıdakı IP-lərdən əlçatan olsun.
-          # XƏBƏRDARLIQ: Brauzer-əsaslı SPA istifadəçiləri xarici IP ilə gəlir;
-          # onların /api/* çağırışları da bloklanacaq. Yalnız server-to-server
-          # və ya VPN/VNet daxili istifadə üçün uyğundur.
+          # WAF Policy: OWASP qaydaları + custom IP məhdudiyyəti yoxdur.
+          # SPA arxitekturasında /api/* çağırışları brauzerlərdən gəlir,
+          # IP whitelist bütün istifadəçiləri bloklar.
           resource "azurerm_web_application_firewall_policy" "main" {
             name                = "burger-builder-waf-policy"
             resource_group_name = azurerm_resource_group.main.name
             location            = azurerm_resource_group.main.location
-
-            # Custom rule: /api/* ünvanına yalnız icazəli IP-lərdən icazə ver
-            custom_rules {
-              name      = "BlockAPIFromInternet"
-              priority  = 1
-              rule_type = "MatchRule"
-              action    = "Block"
-
-              # Şərt 1: URI /api/ ilə başlayır
-              match_conditions {
-                match_variables {
-                  variable_name = "RequestUri"
-                }
-                operator           = "BeginsWith"
-                negation_condition = false
-                match_values       = ["/api/"]
-              }
-
-              # Şərt 2: Mənbə IP icazəli siyahıda DEYİL → blokla
-              match_conditions {
-                match_variables {
-                  variable_name = "RemoteAddr"
-                }
-                operator           = "IPMatch"
-                negation_condition = true
-                match_values       = ["10.0.1.0/24", "52.236.138.163"]
-              }
-            }
 
             managed_rules {
               managed_rule_set {
