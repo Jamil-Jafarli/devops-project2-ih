@@ -35,6 +35,10 @@ env:
   TF_STATE_RG:      "devops-project-2-group-2"
   TF_STATE_STORAGE: ${{ secrets.TF_STATE_STORAGE }}
 
+  # Terraform variables passed via environment
+  TF_VAR_db_password: ${{ secrets.DB_PASSWORD }}
+  TF_VAR_vm_password: ${{ secrets.VM_PASSWORD }}
+
 jobs:
   terraform:
     name: Terraform
@@ -116,6 +120,18 @@ jobs:
           provider "random" {}
           provider "tls" {}
 
+          variable "db_password" {
+            description = "SQL Server administrator password"
+            type        = string
+            sensitive   = true
+          }
+
+          variable "vm_password" {
+            description = "VM administrator password"
+            type        = string
+            sensitive   = true
+          }
+
           locals {
             rg_name  = "devops-project-2-group-2"
             location = "West Europe"
@@ -163,14 +179,7 @@ jobs:
             resource_group_name  = azurerm_resource_group.main.name
             virtual_network_name = azurerm_virtual_network.main.name
             address_prefixes     = ["10.0.1.96/27"]
-
-            delegation {
-              name = "postgresql-delegation"
-              service_delegation {
-                name    = "Microsoft.DBforPostgreSQL/flexibleServers"
-                actions = ["Microsoft.Network/virtualNetworks/subnets/join/action"]
-              }
-            }
+            private_endpoint_network_policies = "Disabled"
           }
 
           # NSG – Frontend (AGW subnet)
@@ -313,7 +322,7 @@ jobs:
             resource_group_name             = azurerm_resource_group.main.name
             size                            = "Standard_D2s_v3"
             admin_username                  = "adminuser"
-            admin_password                  = random_password.vm_password.result
+            admin_password                  = var.vm_password
             network_interface_ids           = [azurerm_network_interface.vm.id]
             disable_password_authentication = false
 
@@ -335,46 +344,88 @@ jobs:
             }
           }
 
-          resource "azurerm_private_dns_zone" "postgres" {
-            name                = "burger-builder-db.private.postgres.database.azure.com"
+          resource "azurerm_private_dns_zone" "sql" {
+            name                = "privatelink.database.windows.net"
             resource_group_name = azurerm_resource_group.main.name
           }
 
-          resource "azurerm_private_dns_zone_virtual_network_link" "postgres" {
-            name                  = "postgres-vnet-link"
-            private_dns_zone_name = azurerm_private_dns_zone.postgres.name
+          resource "azurerm_private_dns_zone_virtual_network_link" "sql" {
+            name                  = "sql-vnet-link"
+            private_dns_zone_name = azurerm_private_dns_zone.sql.name
             virtual_network_id    = azurerm_virtual_network.main.id
             resource_group_name   = azurerm_resource_group.main.name
             registration_enabled  = false
           }
 
-          resource "random_password" "db_password" {
-            length           = 20
-            special          = true
-            override_special = "!#%&*-_=+<>?"
-          }
-
-          resource "random_password" "vm_password" {
-            length           = 20
-            special          = true
-            override_special = "!#%&*-_=+<>?"
-          }
-
-          resource "azurerm_postgresql_flexible_server" "main" {
+          resource "azurerm_mssql_server" "main" {
             name                          = "burger-builder-db"
             resource_group_name           = azurerm_resource_group.main.name
             location                      = azurerm_resource_group.main.location
-            version                       = "16"
-            delegated_subnet_id           = azurerm_subnet.db.id
-            private_dns_zone_id           = azurerm_private_dns_zone.postgres.id
+            version                       = "12.0"
+            administrator_login           = "dbadmin"
+            administrator_login_password  = var.db_password
             public_network_access_enabled = false
-            administrator_login           = "pgadmin"
-            administrator_password        = random_password.db_password.result
-            storage_mb                    = 32768
-            sku_name                      = "B_Standard_B1ms"
-            zone                          = "2"
+          }
 
-            depends_on = [azurerm_private_dns_zone_virtual_network_link.postgres]
+          resource "azurerm_mssql_database" "app" {
+            name      = "burgerbuilder"
+            server_id = azurerm_mssql_server.main.id
+            sku_name  = "Basic"
+          }
+
+          resource "azurerm_private_endpoint" "sql" {
+            name                = "sql-private-endpoint"
+            location            = azurerm_resource_group.main.location
+            resource_group_name = azurerm_resource_group.main.name
+            subnet_id           = azurerm_subnet.db.id
+
+            private_service_connection {
+              name                           = "sql-private-connection"
+              private_connection_resource_id = azurerm_mssql_server.main.id
+              subresource_names              = ["sqlServer"]
+              is_manual_connection           = false
+            }
+
+            private_dns_zone_group {
+              name                 = "sql-dns-zone-group"
+              private_dns_zone_ids = [azurerm_private_dns_zone.sql.id]
+            }
+          }
+
+          # WAF Policy: OWASP qaydaları + custom IP məhdudiyyəti yoxdur.
+          # SPA arxitekturasında /api/* çağırışları brauzerlərdən gəlir,
+          # IP whitelist bütün istifadəçiləri bloklar.
+          resource "azurerm_web_application_firewall_policy" "main" {
+            name                = "burger-builder-waf-policy"
+            resource_group_name = azurerm_resource_group.main.name
+            location            = azurerm_resource_group.main.location
+
+            managed_rules {
+              managed_rule_set {
+                type    = "OWASP"
+                version = "3.2"
+
+                rule_group_override {
+                  rule_group_name = "REQUEST-920-PROTOCOL-ENFORCEMENT"
+                  rule {
+                    id      = "920300"
+                    enabled = false
+                  }
+                  rule {
+                    id      = "920320"
+                    enabled = false
+                  }
+                }
+              }
+            }
+
+            policy_settings {
+              enabled                     = true
+              mode                        = "Prevention"
+              file_upload_limit_in_mb     = 30
+              max_request_body_size_in_kb = 128
+              request_body_check          = true
+            }
           }
 
           resource "azurerm_application_gateway" "main" {
@@ -382,9 +433,11 @@ jobs:
             resource_group_name = azurerm_resource_group.main.name
             location            = azurerm_resource_group.main.location
 
+            firewall_policy_id = azurerm_web_application_firewall_policy.main.id
+
             sku {
-              name     = "Standard_v2"
-              tier     = "Standard_v2"
+              name     = "WAF_v2"
+              tier     = "WAF_v2"
               capacity = 1
             }
 
@@ -405,12 +458,38 @@ jobs:
 
             backend_address_pool {
               name         = local.frontend_pool_name
-              ip_addresses = [azurerm_network_interface.vm.private_ip_address]
+              ip_addresses = ["10.0.1.68"]
             }
 
             backend_address_pool {
               name         = local.api_pool_name
-              ip_addresses = [azurerm_network_interface.vm.private_ip_address]
+              ip_addresses = ["10.0.1.68"]
+            }
+
+            probe {
+              name                = "frontend-health-probe"
+              host                = "10.0.1.68"
+              protocol            = "Http"
+              path                = "/"
+              interval            = 30
+              timeout             = 30
+              unhealthy_threshold = 3
+              match {
+                status_code = ["200-599"]
+              }
+            }
+
+            probe {
+              name                = "api-health-probe"
+              host                = "10.0.1.68"
+              protocol            = "Http"
+              path                = "/api/ingredients"
+              interval            = 30
+              timeout             = 30
+              unhealthy_threshold = 3
+              match {
+                status_code = ["200-599"]
+              }
             }
 
             backend_http_settings {
@@ -419,6 +498,7 @@ jobs:
               port                  = 5173
               protocol              = "Http"
               request_timeout       = 60
+              probe_name            = "frontend-health-probe"
             }
 
             backend_http_settings {
@@ -427,6 +507,7 @@ jobs:
               port                  = 8080
               protocol              = "Http"
               request_timeout       = 60
+              probe_name            = "api-health-probe"
             }
 
             http_listener {
@@ -469,8 +550,8 @@ jobs:
           }
 
           output "db_fqdn" {
-            description = "FQDN of the PostgreSQL server"
-            value       = azurerm_postgresql_flexible_server.main.fqdn
+            description = "FQDN of the SQL Server"
+            value       = azurerm_mssql_server.main.fully_qualified_domain_name
           }
 
           output "vm_ssh_private_key" {
@@ -479,15 +560,9 @@ jobs:
             sensitive   = true
           }
 
-          output "db_password" {
-            description = "PostgreSQL admin password"
-            value       = random_password.db_password.result
-            sensitive   = true
-          }
-
           output "vm_password" {
             description = "VM admin password"
-            value       = random_password.vm_password.result
+            value       = var.vm_password
             sensitive   = true
           }
           TFEOF
@@ -509,17 +584,162 @@ jobs:
           SUB_ID="$ARM_SUBSCRIPTION_ID"
           RG="devops-project-2-group-2"
 
-          # Resource Group
+
+          # Resource Group (idempotent)
           RG_ID=$(az group show --name "$RG" --query id -o tsv 2>/dev/null || echo "")
-          if [ -n "$RG_ID" ]; then
+          STATE_ID=$(terraform state show -no-color azurerm_resource_group.main 2>/dev/null | grep '^id\s*=\s*' | awk -F'=' '{print $2}' | xargs || echo "")
+          if [ "$STATE_ID" = "$RG_ID" ]; then
+            echo "Resource group already imported and matches Azure. Skipping import."
+          elif [ -n "$RG_ID" ]; then
             terraform import azurerm_resource_group.main "$RG_ID" 2>/dev/null || true
           fi
 
-          # PostgreSQL Flexible Server
-          PG_ID="/subscriptions/$SUB_ID/resourceGroups/$RG/providers/Microsoft.DBforPostgreSQL/flexibleServers/burger-builder-db"
-          PG_EXISTS=$(az postgres flexible-server show --resource-group "$RG" --name "burger-builder-db" --query id -o tsv 2>/dev/null || echo "")
-          if [ -n "$PG_EXISTS" ]; then
-            terraform import azurerm_postgresql_flexible_server.main "$PG_ID" 2>/dev/null || true
+          # Azure SQL Server (idempotent)
+          SQL_ID="/subscriptions/$SUB_ID/resourceGroups/$RG/providers/Microsoft.Sql/servers/burger-builder-db"
+          SQL_EXISTS=$(az sql server show --resource-group "$RG" --name "burger-builder-db" --query id -o tsv 2>/dev/null || echo "")
+          STATE_ID=$(terraform state show -no-color azurerm_mssql_server.main 2>/dev/null | grep '^id\s*=\s*' | awk -F'=' '{print $2}' | xargs || echo "")
+          if [ "$STATE_ID" = "$SQL_ID" ]; then
+            echo "SQL Server already imported and matches Azure. Skipping import."
+          elif [ -n "$SQL_EXISTS" ]; then
+            terraform import azurerm_mssql_server.main "$SQL_ID" 2>/dev/null || true
+          fi
+
+          # Virtual Network (idempotent)
+          VNET_ID="/subscriptions/$SUB_ID/resourceGroups/$RG/providers/Microsoft.Network/virtualNetworks/burger-builder-vnet"
+          VNET_EXISTS=$(az network vnet show --resource-group "$RG" --name "burger-builder-vnet" --query id -o tsv 2>/dev/null || echo "")
+          STATE_ID=$(terraform state show -no-color azurerm_virtual_network.main 2>/dev/null | grep '^id\s*=\s*' | awk -F'=' '{print $2}' | xargs || echo "")
+          if [ "$STATE_ID" = "$VNET_ID" ]; then
+            echo "VNet already imported and matches Azure. Skipping import."
+          elif [ -n "$VNET_EXISTS" ]; then
+            terraform import azurerm_virtual_network.main "$VNET_ID" 2>/dev/null || true
+          fi
+
+          # NSG - frontend (idempotent)
+          NSG_FRONTEND_ID="/subscriptions/$SUB_ID/resourceGroups/$RG/providers/Microsoft.Network/networkSecurityGroups/frontend-nsg"
+          NSG_FRONTEND_EXISTS=$(az network nsg show --resource-group "$RG" --name "frontend-nsg" --query id -o tsv 2>/dev/null || echo "")
+          STATE_ID=$(terraform state show -no-color azurerm_network_security_group.frontend 2>/dev/null | grep '^id\s*=\s*' | awk -F'=' '{print $2}' | xargs || echo "")
+          if [ "$STATE_ID" = "$NSG_FRONTEND_ID" ]; then
+            echo "Frontend NSG already imported and matches Azure. Skipping import."
+          elif [ -n "$NSG_FRONTEND_EXISTS" ]; then
+            terraform import azurerm_network_security_group.frontend "$NSG_FRONTEND_ID" 2>/dev/null || true
+          fi
+
+          # NSG - backend (idempotent)
+          NSG_BACKEND_ID="/subscriptions/$SUB_ID/resourceGroups/$RG/providers/Microsoft.Network/networkSecurityGroups/backend-nsg"
+          NSG_BACKEND_EXISTS=$(az network nsg show --resource-group "$RG" --name "backend-nsg" --query id -o tsv 2>/dev/null || echo "")
+          STATE_ID=$(terraform state show -no-color azurerm_network_security_group.backend 2>/dev/null | grep '^id\s*=\s*' | awk -F'=' '{print $2}' | xargs || echo "")
+          if [ "$STATE_ID" = "$NSG_BACKEND_ID" ]; then
+            echo "Backend NSG already imported and matches Azure. Skipping import."
+          elif [ -n "$NSG_BACKEND_EXISTS" ]; then
+            terraform import azurerm_network_security_group.backend "$NSG_BACKEND_ID" 2>/dev/null || true
+          fi
+
+          # Private DNS Zone (idempotent)
+          DNS_ZONE_ID="/subscriptions/$SUB_ID/resourceGroups/$RG/providers/Microsoft.Network/privateDnsZones/privatelink.database.windows.net"
+          DNS_ZONE_EXISTS=$(az network private-dns zone show --resource-group "$RG" --name "privatelink.database.windows.net" --query id -o tsv 2>/dev/null || echo "")
+          STATE_ID=$(terraform state show -no-color azurerm_private_dns_zone.sql 2>/dev/null | grep '^id\s*=\s*' | awk -F'=' '{print $2}' | xargs || echo "")
+          if [ "$STATE_ID" = "$DNS_ZONE_ID" ]; then
+            echo "Private DNS zone already imported and matches Azure. Skipping import."
+          elif [ -n "$DNS_ZONE_EXISTS" ]; then
+            terraform import azurerm_private_dns_zone.sql "$DNS_ZONE_ID" 2>/dev/null || true
+          fi
+
+          # Subnet - agw (idempotent)
+          SUBNET_AGW_ID="/subscriptions/$SUB_ID/resourceGroups/$RG/providers/Microsoft.Network/virtualNetworks/burger-builder-vnet/subnets/agw-subnet"
+          SUBNET_AGW_EXISTS=$(az network vnet subnet show --resource-group "$RG" --vnet-name "burger-builder-vnet" --name "agw-subnet" --query id -o tsv 2>/dev/null || echo "")
+          STATE_ID=$(terraform state show -no-color azurerm_subnet.agw 2>/dev/null | grep '^id\s*=\s*' | awk -F'=' '{print $2}' | xargs || echo "")
+          if [ "$STATE_ID" = "$SUBNET_AGW_ID" ]; then
+            echo "AGW subnet already imported and matches Azure. Skipping import."
+          elif [ -n "$SUBNET_AGW_EXISTS" ]; then
+            terraform import azurerm_subnet.agw "$SUBNET_AGW_ID" 2>/dev/null || true
+          fi
+
+          # Subnet - vm (idempotent)
+          SUBNET_VM_ID="/subscriptions/$SUB_ID/resourceGroups/$RG/providers/Microsoft.Network/virtualNetworks/burger-builder-vnet/subnets/vm-subnet"
+          SUBNET_VM_EXISTS=$(az network vnet subnet show --resource-group "$RG" --vnet-name "burger-builder-vnet" --name "vm-subnet" --query id -o tsv 2>/dev/null || echo "")
+          STATE_ID=$(terraform state show -no-color azurerm_subnet.vm 2>/dev/null | grep '^id\s*=\s*' | awk -F'=' '{print $2}' | xargs || echo "")
+          if [ "$STATE_ID" = "$SUBNET_VM_ID" ]; then
+            echo "VM subnet already imported and matches Azure. Skipping import."
+          elif [ -n "$SUBNET_VM_EXISTS" ]; then
+            terraform import azurerm_subnet.vm "$SUBNET_VM_ID" 2>/dev/null || true
+          fi
+
+          # Subnet - db (idempotent)
+          SUBNET_DB_ID="/subscriptions/$SUB_ID/resourceGroups/$RG/providers/Microsoft.Network/virtualNetworks/burger-builder-vnet/subnets/db-subnet"
+          SUBNET_DB_EXISTS=$(az network vnet subnet show --resource-group "$RG" --vnet-name "burger-builder-vnet" --name "db-subnet" --query id -o tsv 2>/dev/null || echo "")
+          STATE_ID=$(terraform state show -no-color azurerm_subnet.db 2>/dev/null | grep '^id\s*=\s*' | awk -F'=' '{print $2}' | xargs || echo "")
+          if [ "$STATE_ID" = "$SUBNET_DB_ID" ]; then
+            echo "DB subnet already imported and matches Azure. Skipping import."
+          elif [ -n "$SUBNET_DB_EXISTS" ]; then
+            terraform import azurerm_subnet.db "$SUBNET_DB_ID" 2>/dev/null || true
+          fi
+
+          # Private DNS Zone VNet Link (idempotent)
+          DNS_VNET_LINK_ID="/subscriptions/$SUB_ID/resourceGroups/$RG/providers/Microsoft.Network/privateDnsZones/privatelink.database.windows.net/virtualNetworkLinks/sql-vnet-link"
+          DNS_VNET_LINK_EXISTS=$(az network private-dns link vnet show --resource-group "$RG" --zone-name "privatelink.database.windows.net" --name "sql-vnet-link" --query id -o tsv 2>/dev/null || echo "")
+          STATE_ID=$(terraform state show -no-color azurerm_private_dns_zone_virtual_network_link.sql 2>/dev/null | grep '^id\s*=\s*' | awk -F'=' '{print $2}' | xargs || echo "")
+          if [ "$STATE_ID" = "$DNS_VNET_LINK_ID" ]; then
+            echo "Private DNS zone VNet link already imported and matches Azure. Skipping import."
+          elif [ -n "$DNS_VNET_LINK_EXISTS" ]; then
+            terraform import azurerm_private_dns_zone_virtual_network_link.sql "$DNS_VNET_LINK_ID" 2>/dev/null || true
+          fi
+
+
+
+            # Subnet-NSG Association - frontend (idempotent, correct import ID)
+            FRONTEND_ASSOC_NSG=$(az network vnet subnet show --resource-group "$RG" --vnet-name "burger-builder-vnet" --name "agw-subnet" --query "networkSecurityGroup.id" -o tsv 2>/dev/null || echo "")
+            STATE_ID=$(terraform state show -no-color azurerm_subnet_network_security_group_association.frontend 2>/dev/null | grep '^id\s*=\s*' | awk -F'=' '{print $2}' | xargs || echo "")
+            if [ "$STATE_ID" = "$SUBNET_AGW_ID" ]; then
+              echo "Frontend association already imported and matches Azure. Skipping import."
+            elif [ -n "$FRONTEND_ASSOC_NSG" ]; then
+              echo "Importing frontend association: $SUBNET_AGW_ID"
+              terraform import azurerm_subnet_network_security_group_association.frontend "$SUBNET_AGW_ID" 2>&1 || echo "Import failed for frontend association"
+            else
+              echo "No NSG associated with agw-subnet"
+            fi
+
+            # Subnet-NSG Association - backend (idempotent, correct import ID)
+            BACKEND_ASSOC_NSG=$(az network vnet subnet show --resource-group "$RG" --vnet-name "burger-builder-vnet" --name "vm-subnet" --query "networkSecurityGroup.id" -o tsv 2>/dev/null || echo "")
+            STATE_ID=$(terraform state show -no-color azurerm_subnet_network_security_group_association.backend 2>/dev/null | grep '^id\s*=\s*' | awk -F'=' '{print $2}' | xargs || echo "")
+            if [ "$STATE_ID" = "$SUBNET_VM_ID" ]; then
+              echo "Backend association already imported and matches Azure. Skipping import."
+            elif [ -n "$BACKEND_ASSOC_NSG" ]; then
+              echo "Importing backend association: $SUBNET_VM_ID"
+              terraform import azurerm_subnet_network_security_group_association.backend "$SUBNET_VM_ID" 2>&1 || echo "Import failed for backend association"
+            else
+              echo "No NSG associated with vm-subnet"
+            fi
+
+      # ── Release stale state lock if exists ───────────────
+      - name: Release State Lock
+        run: |
+          az storage blob lease break \
+            --account-name "$TF_STATE_STORAGE" \
+            --container-name tfstate \
+            --blob-name "devops-project-2-group-2.tfstate" \
+            --output none 2>/dev/null || true
+
+      # ── Remove NIC association from AGW backend pools ─────
+      # Azure disallows two pools referencing the same NIC IP config.
+      # This detaches the NIC from both pools so Terraform can apply
+      # IP-address-based pools cleanly. Safe to run if AGW doesn't exist yet.
+      - name: Detach NIC from AGW Backend Pools
+        run: |
+          RG="devops-project-2-group-2"
+          AGW_EXISTS=$(az network application-gateway show \
+            --name burger-builder-agw \
+            --resource-group "$RG" \
+            --query name -o tsv 2>/dev/null || echo "")
+
+          if [ -n "$AGW_EXISTS" ]; then
+            for POOL in frontend-backend-pool api-backend-pool; do
+              az network nic ip-config address-pool remove \
+                --nic-name burger-builder-nic \
+                --ip-config-name internal \
+                --resource-group "$RG" \
+                --address-pool "$POOL" \
+                --gateway-name burger-builder-agw 2>/dev/null || true
+            done
           fi
 
       # ── Validate ──────────────────────────────────────────
@@ -531,7 +751,10 @@ jobs:
       - name: Terraform Plan
         id: plan
         working-directory: infra
-        run: terraform plan -out=tfplan -no-color 2>&1 | tee plan_output.txt
+        shell: bash
+        run: |
+          set -o pipefail
+          terraform plan -out=tfplan -no-color 2>&1 | tee plan_output.txt
         continue-on-error: true
 
       - name: Post Plan to PR
@@ -556,10 +779,25 @@ jobs:
       # ── Apply ─────────────────────────────────────────────
       - name: Terraform Apply
         if: |
-          (github.ref == 'refs/heads/main' && github.event_name == 'push') ||
-          (github.event_name == 'workflow_dispatch' && github.event.inputs.action == 'apply')
+          steps.plan.outcome == 'success' &&
+          ((github.ref == 'refs/heads/main' && github.event_name == 'push') ||
+          (github.event_name == 'workflow_dispatch' && github.event.inputs.action == 'apply'))
         working-directory: infra
         run: terraform apply -auto-approve tfplan
+
+      # ── Sync SQL Server password with DB_PASSWORD secret ────
+      # terraform import does not apply administrator_login_password.
+      # This step forces the password to match the secret after every apply.
+      - name: Sync SQL Server Password
+        if: |
+          steps.plan.outcome == 'success' &&
+          ((github.ref == 'refs/heads/main' && github.event_name == 'push') ||
+          (github.event_name == 'workflow_dispatch' && github.event.inputs.action == 'apply'))
+        run: |
+          az sql server update \
+            --resource-group "devops-project-2-group-2" \
+            --name "burger-builder-db" \
+            --admin-password "${{ secrets.DB_PASSWORD }}"
 
       # ── Print sensitive outputs ───────────────────────────
       - name: Print Credentials
@@ -569,7 +807,7 @@ jobs:
         working-directory: infra
         run: |
           echo "VM Password: $(terraform output -raw vm_password)"
-          echo "DB Password: $(terraform output -raw db_password)"
+          echo "DB FQDN: $(terraform output -raw db_fqdn)"
 
       # ── Destroy (manual only) ─────────────────────────────
       - name: Terraform Destroy
