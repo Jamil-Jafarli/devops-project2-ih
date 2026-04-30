@@ -6,9 +6,9 @@ services:
     container_name: burger_db
     restart: unless-stopped
     environment:
-      POSTGRES_DB: burgerbuilder
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: YourStrong!Passw0rd
+        POSTGRES_DB: burgerbuilder
+        POSTGRES_USER: postgres
+        POSTGRES_PASSWORD: c708V0XGsVHpvz2T4L7K
     ports:
       - "5432:5432"
     volumes:
@@ -34,7 +34,7 @@ services:
       DB_PORT: 5432
       DB_NAME: burgerbuilder
       DB_USERNAME: postgres
-      DB_PASSWORD: YourStrong!Passw0rd
+      DB_PASSWORD: c708V0XGsVHpvz2T4L7K
       DB_DRIVER: org.postgresql.Driver
       SERVER_PORT: 8080
       CORS_ALLOWED_ORIGINS: http://localhost:80,http://localhost
