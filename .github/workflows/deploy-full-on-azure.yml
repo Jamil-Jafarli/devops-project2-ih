@@ -625,6 +625,34 @@ jobs:
             terraform import azurerm_private_dns_zone.sql "$DNS_ZONE_ID" 2>/dev/null || true
           fi
 
+          # Subnet - agw
+          SUBNET_AGW_ID="/subscriptions/$SUB_ID/resourceGroups/$RG/providers/Microsoft.Network/virtualNetworks/burger-builder-vnet/subnets/agw-subnet"
+          SUBNET_AGW_EXISTS=$(az network vnet subnet show --resource-group "$RG" --vnet-name "burger-builder-vnet" --name "agw-subnet" --query id -o tsv 2>/dev/null || echo "")
+          if [ -n "$SUBNET_AGW_EXISTS" ]; then
+            terraform import azurerm_subnet.agw "$SUBNET_AGW_ID" 2>/dev/null || true
+          fi
+
+          # Subnet - vm
+          SUBNET_VM_ID="/subscriptions/$SUB_ID/resourceGroups/$RG/providers/Microsoft.Network/virtualNetworks/burger-builder-vnet/subnets/vm-subnet"
+          SUBNET_VM_EXISTS=$(az network vnet subnet show --resource-group "$RG" --vnet-name "burger-builder-vnet" --name "vm-subnet" --query id -o tsv 2>/dev/null || echo "")
+          if [ -n "$SUBNET_VM_EXISTS" ]; then
+            terraform import azurerm_subnet.vm "$SUBNET_VM_ID" 2>/dev/null || true
+          fi
+
+          # Subnet - db
+          SUBNET_DB_ID="/subscriptions/$SUB_ID/resourceGroups/$RG/providers/Microsoft.Network/virtualNetworks/burger-builder-vnet/subnets/db-subnet"
+          SUBNET_DB_EXISTS=$(az network vnet subnet show --resource-group "$RG" --vnet-name "burger-builder-vnet" --name "db-subnet" --query id -o tsv 2>/dev/null || echo "")
+          if [ -n "$SUBNET_DB_EXISTS" ]; then
+            terraform import azurerm_subnet.db "$SUBNET_DB_ID" 2>/dev/null || true
+          fi
+
+          # Private DNS Zone VNet Link
+          DNS_VNET_LINK_ID="/subscriptions/$SUB_ID/resourceGroups/$RG/providers/Microsoft.Network/privateDnsZones/privatelink.database.windows.net/virtualNetworkLinks/sql-vnet-link"
+          DNS_VNET_LINK_EXISTS=$(az network private-dns link vnet show --resource-group "$RG" --zone-name "privatelink.database.windows.net" --name "sql-vnet-link" --query id -o tsv 2>/dev/null || echo "")
+          if [ -n "$DNS_VNET_LINK_EXISTS" ]; then
+            terraform import azurerm_private_dns_zone_virtual_network_link.sql "$DNS_VNET_LINK_ID" 2>/dev/null || true
+          fi
+
       # ── Release stale state lock if exists ───────────────
       - name: Release State Lock
         run: |
