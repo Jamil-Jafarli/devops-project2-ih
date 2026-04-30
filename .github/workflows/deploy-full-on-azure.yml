@@ -427,12 +427,39 @@ jobs:
               ip_addresses = ["10.0.1.68"]
             }
 
+            probe {
+              name                = "frontend-health-probe"
+              host                = "10.0.1.68"
+              protocol            = "Http"
+              path                = "/"
+              interval            = 30
+              timeout             = 30
+              unhealthy_threshold = 3
+              match {
+                status_code = ["200-599"]
+              }
+            }
+
+            probe {
+              name                = "api-health-probe"
+              host                = "10.0.1.68"
+              protocol            = "Http"
+              path                = "/api/ingredients"
+              interval            = 30
+              timeout             = 30
+              unhealthy_threshold = 3
+              match {
+                status_code = ["200-599"]
+              }
+            }
+
             backend_http_settings {
               name                  = local.frontend_http_settings_name
               cookie_based_affinity = "Disabled"
               port                  = 5173
               protocol              = "Http"
               request_timeout       = 60
+              probe_name            = "frontend-health-probe"
             }
 
             backend_http_settings {
@@ -441,6 +468,7 @@ jobs:
               port                  = 8080
               protocol              = "Http"
               request_timeout       = 60
+              probe_name            = "api-health-probe"
             }
 
             http_listener {
