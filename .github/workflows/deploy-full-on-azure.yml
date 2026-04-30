@@ -653,17 +653,26 @@ jobs:
             terraform import azurerm_private_dns_zone_virtual_network_link.sql "$DNS_VNET_LINK_ID" 2>/dev/null || true
           fi
 
-            # Subnet-NSG Association - frontend
 
-              ASSOC_FRONTEND_ID="/subscriptions/$SUB_ID/resourceGroups/$RG/providers/Microsoft.Network/virtualNetworks/burger-builder-vnet/subnets/agw-subnet|/subscriptions/$SUB_ID/resourceGroups/$RG/providers/Microsoft.Network/networkSecurityGroups/frontend-nsg"
-              terraform state show azurerm_subnet_network_security_group_association.frontend > /dev/null 2>&1 || \
-                terraform import azurerm_subnet_network_security_group_association.frontend "$ASSOC_FRONTEND_ID" 2>/dev/null || true
+            # Subnet-NSG Association - frontend
+            FRONTEND_ASSOC_NSG=$(az network vnet subnet show --resource-group "$RG" --vnet-name "burger-builder-vnet" --name "agw-subnet" --query "networkSecurityGroup.id" -o tsv 2>/dev/null || echo "")
+            if [ -n "$FRONTEND_ASSOC_NSG" ]; then
+              echo "Importing frontend association: $SUBNET_AGW_ID|$FRONTEND_ASSOC_NSG"
+              terraform import azurerm_subnet_network_security_group_association.frontend "$SUBNET_AGW_ID|$FRONTEND_ASSOC_NSG" || echo "Import failed for frontend association"
+              terraform state show azurerm_subnet_network_security_group_association.frontend || echo "State show failed for frontend association"
+            else
+              echo "No NSG associated with agw-subnet"
+            fi
 
             # Subnet-NSG Association - backend
-
-              ASSOC_BACKEND_ID="/subscriptions/$SUB_ID/resourceGroups/$RG/providers/Microsoft.Network/virtualNetworks/burger-builder-vnet/subnets/vm-subnet|/subscriptions/$SUB_ID/resourceGroups/$RG/providers/Microsoft.Network/networkSecurityGroups/backend-nsg"
-              terraform state show azurerm_subnet_network_security_group_association.backend > /dev/null 2>&1 || \
-                terraform import azurerm_subnet_network_security_group_association.backend "$ASSOC_BACKEND_ID" 2>/dev/null || true
+            BACKEND_ASSOC_NSG=$(az network vnet subnet show --resource-group "$RG" --vnet-name "burger-builder-vnet" --name "vm-subnet" --query "networkSecurityGroup.id" -o tsv 2>/dev/null || echo "")
+            if [ -n "$BACKEND_ASSOC_NSG" ]; then
+              echo "Importing backend association: $SUBNET_VM_ID|$BACKEND_ASSOC_NSG"
+              terraform import azurerm_subnet_network_security_group_association.backend "$SUBNET_VM_ID|$BACKEND_ASSOC_NSG" || echo "Import failed for backend association"
+              terraform state show azurerm_subnet_network_security_group_association.backend || echo "State show failed for backend association"
+            else
+              echo "No NSG associated with vm-subnet"
+            fi
 
       # ── Release stale state lock if exists ───────────────
       - name: Release State Lock
