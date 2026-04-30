@@ -304,7 +304,7 @@ jobs:
           steps.plan.outcome == 'success' &&
           ((github.ref == 'refs/heads/main' && github.event_name == 'push') ||
           (github.event_name == 'workflow_dispatch' && github.event.inputs.action == 'apply'))
-        working-directory: infra
+        working-directory: terraform
         run: terraform apply -auto-approve tfplan
 
       # ── Sync SQL Server password with DB_PASSWORD secret ────
@@ -326,7 +326,7 @@ jobs:
         if: |
           (github.ref == 'refs/heads/main' && github.event_name == 'push') ||
           (github.event_name == 'workflow_dispatch' && github.event.inputs.action == 'apply')
-        working-directory: infra
+        working-directory: terraform
         run: |
           echo "VM Password: $(terraform output -raw vm_password)"
           echo "DB FQDN: $(terraform output -raw db_fqdn)"
@@ -334,5 +334,5 @@ jobs:
       # ── Destroy (manual only) ─────────────────────────────
       - name: Terraform Destroy
         if: github.event_name == 'workflow_dispatch' && github.event.inputs.action == 'destroy'
-        working-directory: infra
+        working-directory: terraform
         run: terraform destroy -auto-approve
