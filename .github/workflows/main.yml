@@ -28,7 +28,5 @@ jobs:
   call-ansible:
     uses: ./.github/workflows/ansible.yml
     needs: call-terraform
-    with:
-      db_password: ${{ secrets.DB_PASSWORD }}
-      vm_password: ${{ secrets.VM_PASSWORD }}
+    # with: bloku silindi, secret-lər birbaşa inherit olunur
     secrets: inherit
