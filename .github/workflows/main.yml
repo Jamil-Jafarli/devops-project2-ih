@@ -13,6 +13,11 @@ on:
           - apply
           - destroy
 
+permissions:
+  id-token: write
+  contents: read
+  pull-requests: write
+
 jobs:
   call-terraform:
     uses: ./.github/workflows/terraform.yml
