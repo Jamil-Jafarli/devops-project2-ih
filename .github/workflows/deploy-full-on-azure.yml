@@ -654,12 +654,16 @@ jobs:
           fi
 
             # Subnet-NSG Association - frontend
-            ASSOC_FRONTEND_ID="/subscriptions/$SUB_ID/resourceGroups/$RG/providers/Microsoft.Network/virtualNetworks/burger-builder-vnet/subnets/agw-subnet|/subscriptions/$SUB_ID/resourceGroups/$RG/providers/Microsoft.Network/networkSecurityGroups/frontend-nsg"
-            terraform import azurerm_subnet_network_security_group_association.frontend "$ASSOC_FRONTEND_ID" 2>/dev/null || true
+
+              ASSOC_FRONTEND_ID="/subscriptions/$SUB_ID/resourceGroups/$RG/providers/Microsoft.Network/virtualNetworks/burger-builder-vnet/subnets/agw-subnet|/subscriptions/$SUB_ID/resourceGroups/$RG/providers/Microsoft.Network/networkSecurityGroups/frontend-nsg"
+              terraform state show azurerm_subnet_network_security_group_association.frontend > /dev/null 2>&1 || \
+                terraform import azurerm_subnet_network_security_group_association.frontend "$ASSOC_FRONTEND_ID" 2>/dev/null || true
 
             # Subnet-NSG Association - backend
-            ASSOC_BACKEND_ID="/subscriptions/$SUB_ID/resourceGroups/$RG/providers/Microsoft.Network/virtualNetworks/burger-builder-vnet/subnets/vm-subnet|/subscriptions/$SUB_ID/resourceGroups/$RG/providers/Microsoft.Network/networkSecurityGroups/backend-nsg"
-            terraform import azurerm_subnet_network_security_group_association.backend "$ASSOC_BACKEND_ID" 2>/dev/null || true
+
+              ASSOC_BACKEND_ID="/subscriptions/$SUB_ID/resourceGroups/$RG/providers/Microsoft.Network/virtualNetworks/burger-builder-vnet/subnets/vm-subnet|/subscriptions/$SUB_ID/resourceGroups/$RG/providers/Microsoft.Network/networkSecurityGroups/backend-nsg"
+              terraform state show azurerm_subnet_network_security_group_association.backend > /dev/null 2>&1 || \
+                terraform import azurerm_subnet_network_security_group_association.backend "$ASSOC_BACKEND_ID" 2>/dev/null || true
 
       # ── Release stale state lock if exists ───────────────
       - name: Release State Lock
