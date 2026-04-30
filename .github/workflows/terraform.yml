@@ -91,7 +91,7 @@ jobs:
 
       # ── Init ──────────────────────────────────────────────
       - name: Terraform Init
-        working-directory: infra
+        working-directory: terraform
         run: |
           terraform init \
             -backend-config="resource_group_name=$TF_STATE_RG" \
